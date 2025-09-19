@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>REQUESTAN NAA</title>
+<style>
+  :root{
+    --bg:#071225; --neon:#00f7ff; --accent:#00c4cc;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial;background:radial-gradient(circle at 10% 10%, #021024 0%, var(--bg) 50%);color:var(--neon)}
+  .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px}
+  .game{width:980px;max-width:98vw;background:linear-gradient(180deg,#071a2b,#0b2636);border-radius:12px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,0.6); border:1px solid rgba(0,255,255,0.04)}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{margin:0;font-size:20px}
+  .topBar{display:flex;gap:12px;align-items:center}
+  .stat{background:rgba(255,255,255,0.02);padding:8px 12px;border-radius:8px;color:#cfeff2;font-weight:700}
+  .stage{margin-top:14px;display:flex;gap:18px;align-items:flex-start}
+  #puzzle-container{
+    width: calc(75px * 4 + 3px);
+    height: calc(75px * 4 + 3px);
+    display:grid;
+    grid-template-columns: repeat(4,75px);
+    grid-auto-rows:75px;
+    gap:1px;
+    padding:6px;
+    border-radius:8px;
+    border:1px solid rgba(0,247,255,0.06);
+}
+  .piece{ width:75px;height:75px;border-radius:6px;cursor:grab;border:1px solid rgba(0,0,0,0.25); box-shadow:0 6px 14px rgba(0,0,0,0.5);}
+  .drag-over{outline:3px dashed rgba(0,247,255,0.7);transform:scale(1.02)}
+  .controls{display:flex;flex-direction:column;gap:10px;min-width:300px}
+  button{background:var(--neon);color:#002;border:0;padding:10px 12px;border-radius:8px;font-weight:800;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(0,247,255,0.08);color:var(--neon)}
+  #message-card{display:none;margin-top:12px;background:linear-gradient(180deg,#001623,#002434);border:1px solid rgba(0,247,255,0.12);padding:18px;border-radius:12px;color:#dffcff}
+  #message-card h2{color:var(--neon);margin:0 0 8px}
+  #message-card p{color:#cfeff2;white-space:pre-line;margin:0}
+  #powerSpark{position:fixed;inset:0;pointer-events:none;z-index:120}
+  .audioControl{position:fixed;right:18px;top:18px;background:rgba(0,0,0,0.35);padding:8px;border-radius:10px;border:1px solid rgba(0,247,255,0.06);display:flex;gap:8px;align-items:center;z-index:200}
+  .audioControl button{background:transparent;color:var(--neon);border:1px solid rgba(0,247,255,0.08);padding:6px 8px;border-radius:8px}
+  .smallHint{font-size:12px;color:rgba(0,247,255,0.7)}
+  @media(max-width:980px){ .stage{flex-direction:column;align-items:center} .controls{width:100%} }
+</style>
+</head>
+<body>
+<div class="audioControl" id="audioControl" aria-hidden="false">
+  <button id="playPauseBtn">Play ▶</button>
+  <button id="muteBtn">Mute 🔈</button>
+  <div style="font-size:12px;color:rgba(0,247,255,0.85);margin-left:8px">Musik: Game </div>
+</div>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <header>
+      <div>
+        <h1>🤖 Robot Puzzle 8×8 — Musik Aktif</h1>
+        <div class="info">Selesaikan puzzle untuk membuka kartu ucapan & pantun </div>
+      </div>
+      <div class="topBar">
+        <div class="stat">⏱ <span id="timer">0</span>s</div>
+        <div class="stat">❌ Salah: <span id="wrong">0</span></div>
+      </div>
+    </header>
+
+    <div class="stage">
+      <div id="puzzle-container" aria-label="Puzzle grid"></div>
+
+      <div class="controls">
+        <div class="smallHint">Kontrol: tarik potongan ke potongan lain untuk menukar. Tekan <b>Enter</b> atau tombol Cek untuk verifikasi.</div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button id="checkBtn">Cek Jawaban</button>
+          <button id="shuffleBtn" class="ghost">🔀 Acak Ulang</button>
+        </div>
+
+        <div id="message-card" aria-live="polite">
+          <h2 id="cardTitle">Selamat Ulang Tahun ke-18! 🎉</h2>
+          <p id="cardMsg">
+            Semoga di usia yang baru ini, segala impianmu terwujud,
+            langkahmu selalu dimudahkan, dan kebahagiaan selalu menyertaimu.
+            Terima kasih telah menjadi bagian terindah dalam hidupku 💖
+          </p>
+          <hr style="border:none;border-top:1px solid rgba(0,247,255,0.06);margin:10px 0">
+          <div style="font-weight:800;color:var(--accent)">Pantun Matematika:</div>
+          <div id="pantun" style="margin-top:8px;color:#d4fff7"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <canvas id="powerSpark"></canvas>
+  </div>
+</div>
+
+<!-- Audio elements: ganti src dengan file/URL mp3 kamu -->
+<audio id="bgMusic" loop preload="auto">
+  <source src="https://sso.smadu2.com/assets/titip/MUSIK.mp3" type="audio/mpeg">
+  Your browser does not support audio.
+</audio>
+
+<audio id="winMusic" preload="auto">
+  <source src="https://sso.smadu2.com/assets/titip/MUSIK.mp3" type="audio/mpeg">
+  Your browser does not support audio.
+</audio>
+
+<script>
+/* Same puzzle code as before, plus music controls & crossfade */
+const SIZE = 4;
+const PIECE_PX = 75;
+const IMG_URL = "https://sso.smadu2.com/assets/titip/foto3.jpeg";
+const container = document.getElementById('puzzle-container');
+const timerEl = document.getElementById('timer');
+const wrongEl = document.getElementById('wrong');
+const checkBtn = document.getElementById('checkBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const card = document.getElementById('message-card');
+const pantunEl = document.getElementById('pantun');
+const pc = document.getElementById('powerSpark');
+const pctx = pc.getContext('2d');
+
+const bgMusic = document.getElementById('bgMusic');
+const winMusic = document.getElementById('winMusic');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const muteBtn = document.getElementById('muteBtn');
+
+const pantuns = [
+  "Kamu itu seperti integral tak tentu,\nsemakin aku pelajari, semakin tak terbatas cintaku.",
+  "Kamu seperti persamaan linear,\nsederhana tapi memegang solusi hatiku.",
+  "Cinta kita seperti limit tak hingga,\ntak pernah habis walau waktu berjalan.",
+  "Kamu seperti π (pi),\ntak pernah berakhir dan selalu membuatku terpana.",
+  "Kau adalah fungsi yang kontinu di hatiku,\ntanpa diskontinuitas, selalu melekat utuh.",
+  "Kau bagai vektor arah hidupku,\nmenuju titik kebahagiaan yang sama.",
+  "Kasihmu seperti bilangan prima,\nunik, langka, dan tak tergantikan."
+];
+
+let pieces = [];
+let dragged = null;
+let wrongCount = 0;
+let seconds = 0;
+let timerId = null;
+let sparks = [];
+let lastSparkTs = null;
+let started = false;
+let musicPlaying = false;
+let muted = false;
+
+// canvas sizing
+function resizeCanvas(){ pc.width = window.innerWidth; pc.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// build board function
+function buildBoard(){
+  container.innerHTML = '';
+  pieces = [];
+  const coords = [];
+  for(let r=0;r<SIZE;r++){ for(let c=0;c<SIZE;c++){ coords.push({r,c}); } }
+  const shuffled = coords.slice().sort(()=>Math.random()-0.5);
+  shuffled.forEach((pos, idx) => {
+    const div = document.createElement('div');
+    div.className = 'piece';
+    div.draggable = true;
+    div.style.backgroundImage = `url(${IMG_URL})`;
+    div.style.backgroundSize = `${PIECE_PX * SIZE}px ${PIECE_PX * SIZE}px`;
+    div.style.backgroundPosition = `-${pos.c * PIECE_PX}px -${pos.r * PIECE_PX}px`;
+    div.addEventListener('dragstart', ()=>{ dragged = div; if(!started){ startTimer(); tryPlayBgOnInteraction(); started=true; } });
+    div.addEventListener('dragover', e=>{ e.preventDefault(); div.classList.add('drag-over'); });
+    div.addEventListener('dragleave', ()=>div.classList.remove('drag-over'));
+    div.addEventListener('drop', e=>{
+      e.preventDefault(); div.classList.remove('drag-over');
+      if(dragged && dragged !== div){
+        const a = dragged.style.backgroundPosition;
+        dragged.style.backgroundPosition = div.style.backgroundPosition;
+        div.style.backgroundPosition = a;
+      }
+      dragged = null;
+    });
+    container.appendChild(div);
+    pieces.push(div);
+  });
+  wrongCount = 0; wrongEl.textContent = wrongCount;
+  seconds = 0; timerEl.textContent = seconds;
+  stopTimer();
+  card.style.display = 'none';
+}
+
+// timer
+function startTimer(){ if(timerId) return; timerId = setInterval(()=>{ seconds++; timerEl.textContent = seconds; },1000); }
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
+
+// check win
+function checkWin(){
+  const elems = Array.from(container.children);
+  let ok = true;
+  elems.forEach((el, idx)=> {
+    const row = Math.floor(idx / SIZE);
+    const col = idx % SIZE;
+    const needed = `-${col * PIECE_PX}px -${row * PIECE_PX}px`;
+    if(el.style.backgroundPosition.trim() !== needed.trim()) ok = false;
+  });
+  if(ok){
+    stopTimer();
+    showWin();
+  } else {
+    wrongCount++; wrongEl.textContent = wrongCount;
+    flashBorder();
+    // optional "buzz" sound can be added
+  }
+}
+
+function flashBorder(){ container.style.boxShadow = '0 0 18px rgba(255,50,100,0.12)'; setTimeout(()=>{ container.style.boxShadow=''; },300); }
+
+// show win: pantun + card + effects + music switch
+function showWin(){
+  pantunEl.textContent = pantuns[Math.floor(Math.random()*pantuns.length)];
+  card.style.display = 'block';
+  spawnSparks();
+  spawnConfetti();
+  // audio: fade bg down and play winMusic
+  crossfadeToWin();
+}
+
+// sparks & confetti (same as previous)
+function spawnSparks(){
+  const W = pc.width, H = pc.height;
+  for(let i=0;i<120;i++){
+    sparks.push({
+      x: W/2 + (Math.random()-0.5)*300,
+      y: H/2 + (Math.random()-0.5)*160,
+      vx: (Math.random()-0.5)*600,
+      vy: (Math.random()-0.8)*600,
+      life: 0.4 + Math.random()*0.8,
+      color: `hsl(${180 + Math.random()*120},100%,65%)`,
+      size: 2 + Math.random()*4
+    });
+  }
+  requestAnimationFrame(sparkLoop);
+}
+function sparkLoop(ts){
+  if(!lastSparkTs) lastSparkTs = ts;
+  const dt = (ts - lastSparkTs)/1000; lastSparkTs = ts;
+  pctx.clearRect(0,0,pc.width,pc.height);
+  for(let i=sparks.length-1;i>=0;i--){
+    const s = sparks[i];
+    s.vy += 1500 * dt;
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.life -= dt;
+    pctx.beginPath();
+    pctx.fillStyle = s.color;
+    pctx.globalAlpha = Math.max(0, s.life*2);
+    pctx.fillRect(s.x, s.y, s.size, s.size*2);
+    if(s.life<=0 || s.y > pc.height + 50) sparks.splice(i,1);
+  }
+  if(sparks.length>0) requestAnimationFrame(sparkLoop); else lastSparkTs=null;
+}
+function spawnConfetti(){
+  const colors=['#00f7ff','#00c4cc','#66fff0','#a8ffea'];
+  for(let i=0;i<160;i++){
+    const d=document.createElement('div');
+    d.style.position='fixed'; d.style.width='8px'; d.style.height='8px';
+    d.style.left=Math.random()*window.innerWidth+'px'; d.style.top='-10px';
+    d.style.background=colors[Math.floor(Math.random()*colors.length)];
+    d.style.opacity=Math.random()*0.95; d.style.transform=`rotate(${Math.random()*360}deg)`; d.style.zIndex=90; d.style.pointerEvents='none';
+    document.body.appendChild(d);
+    const vy=80+Math.random()*300; const vx=(Math.random()-0.5)*200;
+    const id=setInterval(()=>{ const top=parseFloat(d.style.top)+vy*(16/1000); const left=parseFloat(d.style.left)+vx*(16/1000); d.style.top=top+'px'; d.style.left=left+'px'; if(top>window.innerHeight+50){ clearInterval(id); d.remove(); } },16);
+  }
+}
+
+// MUSIC: basic controls + crossfade
+playPauseBtn.addEventListener('click', ()=>{
+  if(musicPlaying) { pauseMusic(); } else { resumeMusic(); }
+});
+muteBtn.addEventListener('click', ()=>{
+  muted = !muted;
+  bgMusic.muted = muted;
+  winMusic.muted = muted;
+  muteBtn.textContent = muted ? 'Unmute 🔇' : 'Mute 🔈';
+});
+
+function tryPlayBgOnInteraction(){
+  // attempt to start bg music if user interacted
+  if(musicPlaying) return;
+  bgMusic.volume = 0.7;
+  const p = bgMusic.play();
+  if(p && p.then){
+    p.then(()=>{ musicPlaying = true; playPauseBtn.textContent='Pause ⏸'; })
+     .catch(()=>{ /* autoplay blocked */ });
+  } else {
+    musicPlaying = true; playPauseBtn.textContent='Pause ⏸';
+  }
+}
+function resumeMusic(){
+  bgMusic.play().then(()=>{ musicPlaying=true; playPauseBtn.textContent='Pause ⏸'; }).catch(()=>{});
+}
+function pauseMusic(){
+  bgMusic.pause(); musicPlaying=false; playPauseBtn.textContent='Play ▶';
+}
+
+// crossfade bg -> win
+function crossfadeToWin(){
+  try{
+    // ensure winMusic starts at 0 and play
+    winMusic.currentTime = 0;
+    winMusic.volume = 0;
+    const p = winMusic.play();
+    p && p.catch(()=>{});
+    // fade out bg and fade in win
+    const dur = 1200; // ms
+    const steps = 24;
+    let i=0;
+    const id = setInterval(()=>{
+      i++;
+      const t = i/steps;
+      bgMusic.volume = Math.max(0, 0.7*(1 - t));
+      winMusic.volume = Math.min(1, t);
+      if(i>=steps){
+        clearInterval(id);
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+      }
+    }, dur/steps);
+  }catch(e){ console.error(e); }
+}
+
+// attempt to stop winMusic when user pauses bg? we keep win music playing for card
+// Try to play background on first user interaction anywhere (click/drag)
+['pointerdown','keydown','touchstart'].forEach(evt=>{
+  window.addEventListener(evt, ()=>{ tryPlayBgOnInteraction(); }, {once:true,passive:true});
+});
+
+// quick play/pause on page load if user already interacted
+// Start timer when first drag
+container.addEventListener('dragstart', ()=>{ if(!timerId) startTimer(); });
+
+// events
+shuffleBtn.addEventListener('click', ()=>{ buildBoard(); });
+checkBtn.addEventListener('click', ()=>{ checkWin(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Enter') checkWin(); });
+
+// initial build
+buildBoard();
+</script>
+</body>
+</html>
